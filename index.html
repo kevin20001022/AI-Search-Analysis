@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+
+<title>站內搜尋行為分析</title>
+<style>
+:root {
+  --bg:       #f5f2ec;
+  --bg2:      #ffffff;
+  --bg3:      #ede9e1;
+  --gold:     #a07828;
+  --gold-dim: #c8a84c;
+  --cream:    #5c4a1e;
+  --muted:    #9b8e78;
+  --text:     #3a3128;
+  --white:    #1a1410;
+  --accent1:  #a07828;
+  --accent2:  #6b8b6b;
+  --r: 10px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Noto Sans TC", "PingFang TC", "Heiti TC", sans-serif;
+  font-weight: 300;
+  line-height: 1.7;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* grain overlay */
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: 0.18;
+}
+
+.page-wrap { position: relative; z-index: 1; padding: 64px 60px 100px 60px; }
+
+/* ── Header ── */
+.page-header { margin-bottom: 72px; }
+.eyebrow {
+  font-family: "DM Mono", monospace; font-size: 0.7rem; letter-spacing: 0.25em;
+  color: var(--gold); text-transform: uppercase; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--gold-dim); max-width: 80px; }
+h1 {
+  font-family: "Playfair Display", serif; font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 900; color: var(--white); line-height: 1.15;
+  letter-spacing: -0.02em; margin-bottom: 16px;
+}
+.subtitle {
+  font-family: "DM Mono", monospace; font-size: 0.75rem; color: var(--muted);
+  letter-spacing: 0.08em; display: flex; align-items: center; gap: 16px;
+}
+.subtitle span { color: var(--gold-dim); }
+.hairline { width: 100%; height: 1px; background: linear-gradient(90deg, var(--gold-dim) 0%, transparent 70%); margin: 40px 0; }
+
+/* ── Section heading ── */
+h2 {
+  font-family: "Playfair Display", serif; font-size: 1.3rem; color: var(--white);
+  font-weight: 700; margin: 52px 0 24px; display: flex; align-items: baseline; gap: 14px;
+}
+h2 .h2-num {
+  font-family: "DM Mono", monospace; font-size: 0.65rem; color: var(--gold);
+  letter-spacing: 0.2em; border: 1px solid var(--gold-dim); border-radius: 2px;
+  padding: 2px 6px; position: relative; top: -1px;
+}
+h3 {
+  font-family: "DM Mono", monospace; font-size: 0.72rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--gold); margin-bottom: 18px;
+  display: flex; align-items: center; gap: 10px;
+}
+h3::after { content: ""; height: 1px; flex: 1; background: var(--bg3); }
+
+/* ── Cards ── */
+.card {
+  background: var(--bg2); border: 1px solid rgba(160,120,40,0.18);
+  border-radius: var(--r); padding: 32px 36px; margin-bottom: 20px;
+  position: relative; overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--gold-dim), transparent);
+}
+
+/* ── Stat grid ── */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 2px; }
+.stat {
+  background: var(--bg3); padding: 28px 24px; position: relative;
+  border-right: 1px solid rgba(160,120,40,0.15);
+  animation: fadeUp 0.6s ease both;
+}
+.stat:last-child { border-right: none; }
+.stat .num {
+  font-family: "DM Mono", monospace; font-size: 2.4rem; font-weight: 500;
+  color: var(--gold); line-height: 1; margin-bottom: 8px; letter-spacing: -0.03em;
+}
+.stat .lbl { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; line-height: 1.4; font-weight: 400; }
+.stat-note { margin-top: 20px; font-family: "DM Mono", monospace; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.05em; }
+
+/* ── Bar chart ── */
+.bar-list { display: flex; flex-direction: column; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: 140px 1fr 64px 52px; align-items: center; gap: 12px;
+           animation: fadeUp 0.5s ease both; }
+.bar-label { font-size: 0.82rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { background: rgba(0,0,0,0.07); border-radius: 2px; height: 6px; position: relative; overflow: hidden; }
+.bar-fill {
+  height: 100%; border-radius: 2px; position: relative;
+  transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bar-fill::after {
+  content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 3px;
+  background: rgba(255,255,255,0.6); border-radius: 2px;
+}
+.bar-count { font-family: "DM Mono", monospace; font-size: 0.75rem; color: var(--cream); text-align: right; }
+.bar-pct { font-family: "DM Mono", monospace; font-size: 0.7rem; color: var(--muted); text-align: right; }
+
+/* ── Two col ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ── Tags ── */
+.tag-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  font-family: "DM Mono", monospace; font-size: 0.7rem; letter-spacing: 0.05em;
+  border: 1px solid rgba(160,120,40,0.35); border-radius: 2px;
+  padding: 3px 10px; color: var(--gold); background: rgba(160,120,40,0.08);
+}
+
+/* ── Combo table ── */
+.combo-table { width: 100%; border-collapse: collapse; }
+.combo-table thead th {
+  font-family: "DM Mono", monospace; font-size: 0.65rem; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--muted); padding: 0 12px 14px;
+  text-align: left; border-bottom: 1px solid rgba(160,120,40,0.25);
+}
+.combo-table thead th:last-child, .combo-table thead th:nth-last-child(2) { text-align: right; }
+.combo-table tbody tr { border-bottom: 1px solid rgba(0,0,0,0.06); transition: background 0.15s; }
+.combo-table tbody tr:hover { background: rgba(160,120,40,0.05); }
+.combo-table td { padding: 10px 12px; font-size: 0.82rem; }
+.combo-table td:last-child { text-align: right; }
+.combo-table td:nth-last-child(2) { text-align: right; font-family: "DM Mono", monospace; color: var(--gold); font-size: 0.8rem; }
+.combo-table td:last-child { font-family: "DM Mono", monospace; font-size: 0.72rem; color: var(--muted); }
+
+/* ── Device donut (CSS only) ── */
+.donut-wrap { display: flex; gap: 32px; align-items: center; }
+.donut { position: relative; width: 120px; height: 120px; flex-shrink: 0; }
+.donut svg { transform: rotate(-90deg); }
+.donut-label {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.donut-label .d-num { font-family: "DM Mono", monospace; font-size: 1.2rem; color: var(--white); line-height: 1; }
+.donut-label .d-lbl { font-size: 0.6rem; color: var(--muted); margin-top: 3px; }
+.donut-legend { flex: 1; }
+.legend-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.82rem; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.legend-name { flex: 1; color: var(--text); }
+.legend-val { font-family: "DM Mono", monospace; font-size: 0.78rem; color: var(--cream); }
+.legend-pct { font-family: "DM Mono", monospace; font-size: 0.7rem; color: var(--muted); width: 44px; text-align: right; }
+
+/* ── Search type cards ── */
+.type-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 40px; }
+.type-card {
+  background: var(--bg2); border: 1px solid rgba(160,120,40,0.18);
+  border-radius: var(--r); padding: 32px; position: relative; overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.type-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--gold-dim), transparent);
+}
+.type-card .tc-label { font-family: "DM Mono", monospace; font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 12px; font-weight: 500; }
+.type-card .tc-total { font-family: "DM Mono", monospace; font-size: 1.8rem; color: var(--white); font-weight: 500; margin-bottom: 4px; }
+.type-card .tc-sub { font-size: 0.75rem; color: var(--muted); margin-bottom: 24px; font-weight: 400; }
+
+/* ── Animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-header { animation: fadeUp 0.8s ease both; }
+.card { animation: fadeUp 0.6s ease both; }
+
+.insight-box {
+  display: flex; gap: 16px; align-items: flex-start;
+  background: linear-gradient(135deg, #fffbf0 0%, #fef9ec 100%);
+  border: 1px solid rgba(160,120,40,0.25); border-left: 4px solid var(--gold);
+  border-radius: var(--r); padding: 24px 28px; margin: 20px 0 48px;
+  box-shadow: 0 2px 8px rgba(160,120,40,0.08);
+}
+.insight-icon { font-size: 1.4rem; line-height: 1; flex-shrink: 0; margin-top: 2px; }
+.insight-body { flex: 1; }
+.insight-title {
+  font-family: "DM Mono", monospace; font-size: 0.65rem; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--gold); margin-bottom: 10px; font-weight: 500;
+}
+.insight-body p {
+  font-size: 0.88rem; color: var(--text); line-height: 1.75; margin-bottom: 8px;
+}
+.insight-body p:last-child { margin-bottom: 0; }
+.insight-body strong { color: var(--gold); font-weight: 600; }
+
+.sidenav {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 200px;
+  background: #fff; border-right: 1px solid rgba(160,120,40,0.15);
+  padding: 40px 0; display: flex; flex-direction: column; z-index: 100;
+  box-shadow: 2px 0 16px rgba(0,0,0,0.04);
+}
+.sidenav .nav-logo {
+  font-family: "DM Mono", monospace; font-size: 0.6rem; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--gold); padding: 0 24px 28px;
+  border-bottom: 1px solid rgba(160,120,40,0.15); margin-bottom: 20px;
+}
+.sidenav a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 24px; font-size: 0.8rem; color: var(--muted);
+  text-decoration: none; transition: all 0.2s; border-left: 2px solid transparent;
+  font-family: "Noto Sans TC", sans-serif;
+}
+.sidenav a:hover, .sidenav a.active {
+  color: var(--gold); border-left-color: var(--gold);
+  background: rgba(160,120,40,0.05);
+}
+.sidenav a .nav-num {
+  font-family: "DM Mono", monospace; font-size: 0.6rem; color: var(--gold-dim);
+  opacity: 0.7;
+}
+.sidenav .nav-section-label {
+  font-family: "DM Mono", monospace; font-size: 0.6rem; letter-spacing: 0.15em;
+  text-transform: uppercase; color: rgba(160,120,40,0.5); padding: 16px 24px 6px;
+}
+.page-wrap { margin-left: 200px; }
+@media (max-width: 860px) {
+  .sidenav { display: none; }
+  .page-wrap { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+
+<nav class="sidenav">
+  <div class="nav-logo">Search Analytics</div>
+  <div class="nav-section-label">Task 01</div>
+  <a href="#t1-top"><span class="nav-num">→</span> 裝置分布總覽</a>
+  <a href="#t1-compare"><span class="nav-num">→</span> 裝置類型對比</a>
+  <div class="nav-section-label" style="margin-top:12px">Task 02</div>
+  <a href="#t2-overview"><span class="nav-num">→</span> 行為總覽</a>
+  <a href="#t2-freq"><span class="nav-num">→</span> 篩選欄位頻率</a>
+  <a href="#t2-topvals"><span class="nav-num">→</span> 熱門篩選選項</a>
+  <a href="#t2-combos"><span class="nav-num">→</span> 常見篩選組合</a>
+  <div class="nav-section-label" style="margin-top:12px">Task 03</div>
+  <a href="#t3-general"><span class="nav-num">→</span> 一般搜尋熱詞</a>
+  <a href="#t3-advanced"><span class="nav-num">→</span> 進階搜尋熱詞</a>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- ══════════════════ TASK 1 ══════════════════ -->
+  <section id="t1-top">
+    <header class="page-header">
+      <div class="eyebrow">站內搜尋行為分析　·　Task 01</div>
+      <h1>搜尋類型<br>× 裝置分布</h1>
+      <p class="subtitle">
+        <span>2026.02.04</span> — <span>2026.03.09</span>
+        &emsp;｜&emsp; 僅計算有輸入搜尋文字之紀錄
+      </p>
+    </header>
+    <div class="hairline"></div>
+    <h2><span class="h2-num">01</span> 各搜尋類型裝置分布</h2>
+    <div class="type-cards">
+      <div class="type-card">
+        <div class="tc-label">一般搜尋</div>
+        <div class="tc-total">522</div>
+        <div class="tc-sub">筆有效搜尋紀錄</div>
+        <div class="donut-wrap">
+          <div class="donut">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="46" fill="none" stroke="#e0d8cc" stroke-width="10"/>
+      <circle cx="60" cy="60" r="46" fill="none" stroke="#c9a84c" stroke-width="10"
+              stroke-dasharray="289.0" stroke-linecap="round"
+              data-stroke="3.2" style="stroke-dashoffset:289.0;transition:stroke-dashoffset 1s ease"/>
+    </svg>
+            <div class="donut-label">
+              <div class="d-num">98.9%</div>
+              <div class="d-lbl">WEB</div>
+            </div>
+          </div>
+          <div class="donut-legend">
+            <div class="legend-row">
+              <div class="legend-dot" style="background:#6b8b9e"></div>
+              <div class="legend-name">IOS</div>
+              <div class="legend-val">6 筆</div>
+              <div class="legend-pct">1.1%</div>
+            </div>
+            <div class="legend-row">
+              <div class="legend-dot" style="background:#c9a84c"></div>
+              <div class="legend-name">WEB</div>
+              <div class="legend-val">516 筆</div>
+              <div class="legend-pct">98.9%</div>
+            </div></div>
+        </div>
+      </div>
+      <div class="type-card">
+        <div class="tc-label">進階搜尋</div>
+        <div class="tc-total">437</div>
+        <div class="tc-sub">筆有效搜尋紀錄</div>
+        <div class="donut-wrap">
+          <div class="donut">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="46" fill="none" stroke="#e0d8cc" stroke-width="10"/>
+      <circle cx="60" cy="60" r="46" fill="none" stroke="#c9a84c" stroke-width="10"
+              stroke-dasharray="289.0" stroke-linecap="round"
+              data-stroke="50.3" style="stroke-dashoffset:289.0;transition:stroke-dashoffset 1s ease"/>
+    </svg>
+            <div class="donut-label">
+              <div class="d-num">82.6%</div>
+              <div class="d-lbl">WEB</div>
+            </div>
+          </div>
+          <div class="donut-legend">
+            <div class="legend-row">
+              <div class="legend-dot" style="background:#6b8b9e"></div>
+              <div class="legend-name">IOS</div>
+              <div class="legend-val">76 筆</div>
+              <div class="legend-pct">17.4%</div>
+            </div>
+            <div class="legend-row">
+              <div class="legend-dot" style="background:#c9a84c"></div>
+              <div class="legend-name">WEB</div>
+              <div class="legend-val">361 筆</div>
+              <div class="legend-pct">82.6%</div>
+            </div></div>
+        </div>
+      </div></div>
+  </section>
+
+  <section id="t1-compare">
+    <div class="card">
+      <h3>裝置 × 搜尋類型 對比</h3>
+      <h3 style="margin-top:20px">IOS 裝置各搜尋類型分布</h3><div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="一般搜尋" style="width:140px">一般搜尋</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="7.9" style="background:linear-gradient(90deg,#6b8b9e88,#6b8b9e);width:0%"></div>
+        </div>
+        <div class="bar-count">6</div>
+        <div class="bar-pct">1.1%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="進階搜尋" style="width:140px">進階搜尋</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#6b8b9e88,#6b8b9e);width:0%"></div>
+        </div>
+        <div class="bar-count">76</div>
+        <div class="bar-pct">17.4%</div>
+      </div></div><h3 style="margin-top:20px">WEB 裝置各搜尋類型分布</h3><div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="一般搜尋" style="width:140px">一般搜尋</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">516</div>
+        <div class="bar-pct">98.9%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="進階搜尋" style="width:140px">進階搜尋</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="70.0" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">361</div>
+        <div class="bar-pct">82.6%</div>
+      </div></div>
+    </div>
+    <div class="insight-box">
+      <div class="insight-icon">💡</div>
+      <div class="insight-body">
+        <div class="insight-title">Task 01 結論</div>
+        <p>一般搜尋幾乎由 Web 端主導（98.9%），行動裝置使用率極低，顯示此功能主要在桌面情境下被觸發。</p>
+        <p>相較之下，進階搜尋的 iOS 佔比明顯偏高（17.4% vs 1.1%），推測 App 端在介面設計上對進階篩選有更顯著的入口或引導，促使行動用戶更容易啟用進階搜尋。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════ TASK 2 ══════════════════ -->
+
+  <section id="t2-overview" style="margin-top:80px">
+    <header class="page-header">
+      <div class="eyebrow">站內搜尋行為分析　·　Task 02</div>
+      <h1>搜尋與篩選<br>行為深度分析</h1>
+      <p class="subtitle">
+        <span>2026.02.04</span> — <span>2026.03.09</span>
+        &emsp;｜&emsp; 翻頁去重（同 IP + 同參數 30 秒內僅計 1 次）
+      </p>
+    </header>
+    <div class="hairline"></div>
+    <h2><span class="h2-num">01</span> 行為總覽</h2>
+    <div class="card">
+      <div class="stat-grid"><div class="stat"><div class="num">522</div><div class="lbl">搜尋次數</div></div><div class="stat"><div class="num">10,511</div><div class="lbl">篩選次數</div></div><div class="stat"><div class="num">11,033</div><div class="lbl">合計次數</div></div><div class="stat"><div class="num">4.7%</div><div class="lbl">搜尋佔比</div></div><div class="stat"><div class="num">95.3%</div><div class="lbl">篩選佔比</div></div></div>
+      
+    <div class="donut-wrap" style="margin-top:28px">
+      <div class="donut">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="46" fill="none" stroke="#e0d8cc" stroke-width="10"/>
+      <circle cx="60" cy="60" r="46" fill="none" stroke="#8b9e6b" stroke-width="10"
+              stroke-dasharray="289.0" stroke-linecap="round"
+              data-stroke="13.7" style="stroke-dashoffset:289.0;transition:stroke-dashoffset 1s ease"/>
+    </svg>
+        <div class="donut-label">
+          <div class="d-num">95%</div>
+          <div class="d-lbl">篩選</div>
+        </div>
+      </div>
+      <div class="donut-legend">
+        <div class="legend-row"><div class="legend-dot" style="background:#8b9e6b"></div><div class="legend-name">純篩選</div><div class="legend-val">10,511</div><div class="legend-pct">95.3%</div></div>
+        <div class="legend-row"><div class="legend-dot" style="background:#c9a84c"></div><div class="legend-name">有搜尋文字</div><div class="legend-val">522</div><div class="legend-pct">4.7%</div></div>
+        <div style="margin-top:14px;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted)">
+          去重前：搜尋 959 / 篩選 18,920
+        </div>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <section id="t2-freq">
+    <h2><span class="h2-num">02</span> 篩選欄位使用頻率</h2>
+    <div class="two-col">
+      <div class="card">
+        <h3>各欄位使用次數</h3>
+        <div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="類別" style="width:160px">類別</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">10,511</div>
+        <div class="bar-pct">100.0%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="類型" style="width:160px">類型</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="69.0" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">7,249</div>
+        <div class="bar-pct">69.0%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:100ms">
+        <div class="bar-label" title="影視人才職務" style="width:160px">影視人才職務</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="5.9" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">625</div>
+        <div class="bar-pct">5.9%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:150ms">
+        <div class="bar-label" title="風格" style="width:160px">風格</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="5.7" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">594</div>
+        <div class="bar-pct">5.7%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:200ms">
+        <div class="bar-label" title="產業" style="width:160px">產業</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="5.0" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">527</div>
+        <div class="bar-pct">5.0%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:250ms">
+        <div class="bar-label" title="影視人才服務項目" style="width:160px">影視人才服務項目</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="2.0" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">213</div>
+        <div class="bar-pct">2.0%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:300ms">
+        <div class="bar-label" title="片長" style="width:160px">片長</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="1.6" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">170</div>
+        <div class="bar-pct">1.6%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:350ms">
+        <div class="bar-label" title="所在地" style="width:160px">所在地</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="0.7" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">77</div>
+        <div class="bar-pct">0.7%</div>
+      </div></div>
+      </div>
+      <div class="card">
+        <h3>每次篩選條件數量分布</h3>
+        <div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="1 個條件" style="width:120px">1 個條件</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="16.1" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">1,423</div>
+        <div class="bar-pct">13.5%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="2 個條件" style="width:120px">2 個條件</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">8,833</div>
+        <div class="bar-pct">84.0%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:100ms">
+        <div class="bar-label" title="3 個條件" style="width:120px">3 個條件</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="2.0" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">173</div>
+        <div class="bar-pct">1.6%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:150ms">
+        <div class="bar-label" title="4 個條件" style="width:120px">4 個條件</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="0.6" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">52</div>
+        <div class="bar-pct">0.5%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:200ms">
+        <div class="bar-label" title="5 個條件" style="width:120px">5 個條件</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="0.3" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">30</div>
+        <div class="bar-pct">0.3%</div>
+      </div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="t2-topvals">
+    <h2><span class="h2-num">03</span> 各篩選欄位熱門選項</h2>
+    <div class="card">
+      <div class="two-col"><div style="margin-bottom:32px"><h3>類別</h3><div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="影像作品" style="width:180px">影像作品</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">8,181</div>
+        <div class="bar-pct">77.8%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="影視人才" style="width:180px">影視人才</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="19.3" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">1,579</div>
+        <div class="bar-pct">15.0%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:100ms">
+        <div class="bar-label" title="協力團隊" style="width:180px">協力團隊</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="9.2" style="background:linear-gradient(90deg,#c9a84c88,#c9a84c);width:0%"></div>
+        </div>
+        <div class="bar-count">751</div>
+        <div class="bar-pct">7.1%</div>
+      </div></div></div><div style="margin-bottom:32px"><h3>類型</h3><div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="AI 生成" style="width:180px">AI 生成</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">6,074</div>
+        <div class="bar-pct">57.8%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="短影音" style="width:180px">短影音</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="7.4" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">449</div>
+        <div class="bar-pct">4.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:100ms">
+        <div class="bar-label" title="廣告" style="width:180px">廣告</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="5.4" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">325</div>
+        <div class="bar-pct">3.1%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:150ms">
+        <div class="bar-label" title="品牌形象" style="width:180px">品牌形象</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="3.6" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">218</div>
+        <div class="bar-pct">2.1%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:200ms">
+        <div class="bar-label" title="網路廣告" style="width:180px">網路廣告</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="1.5" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">90</div>
+        <div class="bar-pct">0.9%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:250ms">
+        <div class="bar-label" title="MV" style="width:180px">MV</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="1.1" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">65</div>
+        <div class="bar-pct">0.6%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:300ms">
+        <div class="bar-label" title="動畫" style="width:180px">動畫</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="0.8" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">48</div>
+        <div class="bar-pct">0.5%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:350ms">
+        <div class="bar-label" title="紀錄片" style="width:180px">紀錄片</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="0.7" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">42</div>
+        <div class="bar-pct">0.4%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:400ms">
+        <div class="bar-label" title="訪談" style="width:180px">訪談</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="0.7" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">41</div>
+        <div class="bar-pct">0.4%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:450ms">
+        <div class="bar-label" title="企業/產品簡介" style="width:180px">企業/產品簡介</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="0.6" style="background:linear-gradient(90deg,#8b9e6b88,#8b9e6b);width:0%"></div>
+        </div>
+        <div class="bar-count">39</div>
+        <div class="bar-pct">0.4%</div>
+      </div></div></div><div style="margin-bottom:32px"><h3>片長</h3><div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="30~60秒" style="width:180px">30~60秒</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#6b8b9e88,#6b8b9e);width:0%"></div>
+        </div>
+        <div class="bar-count">95</div>
+        <div class="bar-pct">0.9%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="10~30秒" style="width:180px">10~30秒</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="61.1" style="background:linear-gradient(90deg,#6b8b9e88,#6b8b9e);width:0%"></div>
+        </div>
+        <div class="bar-count">58</div>
+        <div class="bar-pct">0.6%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:100ms">
+        <div class="bar-label" title="600秒以上" style="width:180px">600秒以上</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="37.9" style="background:linear-gradient(90deg,#6b8b9e88,#6b8b9e);width:0%"></div>
+        </div>
+        <div class="bar-count">36</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:150ms">
+        <div class="bar-label" title="180~600秒" style="width:180px">180~600秒</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="26.3" style="background:linear-gradient(90deg,#6b8b9e88,#6b8b9e);width:0%"></div>
+        </div>
+        <div class="bar-count">25</div>
+        <div class="bar-pct">0.2%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:200ms">
+        <div class="bar-label" title="60~180秒" style="width:180px">60~180秒</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="25.3" style="background:linear-gradient(90deg,#6b8b9e88,#6b8b9e);width:0%"></div>
+        </div>
+        <div class="bar-count">24</div>
+        <div class="bar-pct">0.2%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:250ms">
+        <div class="bar-label" title="10秒以下" style="width:180px">10秒以下</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="14.7" style="background:linear-gradient(90deg,#6b8b9e88,#6b8b9e);width:0%"></div>
+        </div>
+        <div class="bar-count">14</div>
+        <div class="bar-pct">0.1%</div>
+      </div></div></div><div style="margin-bottom:32px"><h3>風格</h3><div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="溫暖" style="width:180px">溫暖</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#9e6b8b88,#9e6b8b);width:0%"></div>
+        </div>
+        <div class="bar-count">68</div>
+        <div class="bar-pct">0.6%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="生活" style="width:180px">生活</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="86.8" style="background:linear-gradient(90deg,#9e6b8b88,#9e6b8b);width:0%"></div>
+        </div>
+        <div class="bar-count">59</div>
+        <div class="bar-pct">0.6%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:100ms">
+        <div class="bar-label" title="時尚" style="width:180px">時尚</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="75.0" style="background:linear-gradient(90deg,#9e6b8b88,#9e6b8b);width:0%"></div>
+        </div>
+        <div class="bar-count">51</div>
+        <div class="bar-pct">0.5%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:150ms">
+        <div class="bar-label" title="寫實" style="width:180px">寫實</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="69.1" style="background:linear-gradient(90deg,#9e6b8b88,#9e6b8b);width:0%"></div>
+        </div>
+        <div class="bar-count">47</div>
+        <div class="bar-pct">0.4%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:200ms">
+        <div class="bar-label" title="藝術" style="width:180px">藝術</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="69.1" style="background:linear-gradient(90deg,#9e6b8b88,#9e6b8b);width:0%"></div>
+        </div>
+        <div class="bar-count">47</div>
+        <div class="bar-pct">0.4%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:250ms">
+        <div class="bar-label" title="清新日系" style="width:180px">清新日系</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="66.2" style="background:linear-gradient(90deg,#9e6b8b88,#9e6b8b);width:0%"></div>
+        </div>
+        <div class="bar-count">45</div>
+        <div class="bar-pct">0.4%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:300ms">
+        <div class="bar-label" title="科技感" style="width:180px">科技感</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="64.7" style="background:linear-gradient(90deg,#9e6b8b88,#9e6b8b);width:0%"></div>
+        </div>
+        <div class="bar-count">44</div>
+        <div class="bar-pct">0.4%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:350ms">
+        <div class="bar-label" title="詼諧搞笑" style="width:180px">詼諧搞笑</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="52.9" style="background:linear-gradient(90deg,#9e6b8b88,#9e6b8b);width:0%"></div>
+        </div>
+        <div class="bar-count">36</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:400ms">
+        <div class="bar-label" title="歷史" style="width:180px">歷史</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="50.0" style="background:linear-gradient(90deg,#9e6b8b88,#9e6b8b);width:0%"></div>
+        </div>
+        <div class="bar-count">34</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:450ms">
+        <div class="bar-label" title="AI 生成" style="width:180px">AI 生成</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="41.2" style="background:linear-gradient(90deg,#9e6b8b88,#9e6b8b);width:0%"></div>
+        </div>
+        <div class="bar-count">28</div>
+        <div class="bar-pct">0.3%</div>
+      </div></div></div><div style="margin-bottom:32px"><h3>產業</h3><div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="餐飲/食品" style="width:180px">餐飲/食品</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#6b9e8b88,#6b9e8b);width:0%"></div>
+        </div>
+        <div class="bar-count">43</div>
+        <div class="bar-pct">0.4%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="公部門/國家城市" style="width:180px">公部門/國家城市</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="97.7" style="background:linear-gradient(90deg,#6b9e8b88,#6b9e8b);width:0%"></div>
+        </div>
+        <div class="bar-count">42</div>
+        <div class="bar-pct">0.4%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:100ms">
+        <div class="bar-label" title="娛樂" style="width:180px">娛樂</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="83.7" style="background:linear-gradient(90deg,#6b9e8b88,#6b9e8b);width:0%"></div>
+        </div>
+        <div class="bar-count">36</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:150ms">
+        <div class="bar-label" title="3C/網路科技" style="width:180px">3C/網路科技</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="81.4" style="background:linear-gradient(90deg,#6b9e8b88,#6b9e8b);width:0%"></div>
+        </div>
+        <div class="bar-count">35</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:200ms">
+        <div class="bar-label" title="創作" style="width:180px">創作</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="76.7" style="background:linear-gradient(90deg,#6b9e8b88,#6b9e8b);width:0%"></div>
+        </div>
+        <div class="bar-count">33</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:250ms">
+        <div class="bar-label" title="音樂" style="width:180px">音樂</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="74.4" style="background:linear-gradient(90deg,#6b9e8b88,#6b9e8b);width:0%"></div>
+        </div>
+        <div class="bar-count">32</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:300ms">
+        <div class="bar-label" title="藝文" style="width:180px">藝文</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="53.5" style="background:linear-gradient(90deg,#6b9e8b88,#6b9e8b);width:0%"></div>
+        </div>
+        <div class="bar-count">23</div>
+        <div class="bar-pct">0.2%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:350ms">
+        <div class="bar-label" title="學校/教育" style="width:180px">學校/教育</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="51.2" style="background:linear-gradient(90deg,#6b9e8b88,#6b9e8b);width:0%"></div>
+        </div>
+        <div class="bar-count">22</div>
+        <div class="bar-pct">0.2%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:400ms">
+        <div class="bar-label" title="電玩/手遊/遊戲" style="width:180px">電玩/手遊/遊戲</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="51.2" style="background:linear-gradient(90deg,#6b9e8b88,#6b9e8b);width:0%"></div>
+        </div>
+        <div class="bar-count">22</div>
+        <div class="bar-pct">0.2%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:450ms">
+        <div class="bar-label" title="文創" style="width:180px">文創</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="48.8" style="background:linear-gradient(90deg,#6b9e8b88,#6b9e8b);width:0%"></div>
+        </div>
+        <div class="bar-count">21</div>
+        <div class="bar-pct">0.2%</div>
+      </div></div></div><div style="margin-bottom:32px"><h3>影視人才職務</h3><div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="導演" style="width:180px">導演</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#9e8b6b88,#9e8b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">223</div>
+        <div class="bar-pct">2.1%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="攝影師" style="width:180px">攝影師</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="45.7" style="background:linear-gradient(90deg,#9e8b6b88,#9e8b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">102</div>
+        <div class="bar-pct">1.0%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:100ms">
+        <div class="bar-label" title="製片" style="width:180px">製片</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="39.0" style="background:linear-gradient(90deg,#9e8b6b88,#9e8b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">87</div>
+        <div class="bar-pct">0.8%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:150ms">
+        <div class="bar-label" title="副導" style="width:180px">副導</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="13.0" style="background:linear-gradient(90deg,#9e8b6b88,#9e8b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">29</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:200ms">
+        <div class="bar-label" title="攝影指導" style="width:180px">攝影指導</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="13.0" style="background:linear-gradient(90deg,#9e8b6b88,#9e8b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">29</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:250ms">
+        <div class="bar-label" title="2D動畫" style="width:180px">2D動畫</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="11.7" style="background:linear-gradient(90deg,#9e8b6b88,#9e8b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">26</div>
+        <div class="bar-pct">0.2%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:300ms">
+        <div class="bar-label" title="音效設計" style="width:180px">音效設計</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="11.7" style="background:linear-gradient(90deg,#9e8b6b88,#9e8b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">26</div>
+        <div class="bar-pct">0.2%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:350ms">
+        <div class="bar-label" title="執行導演" style="width:180px">執行導演</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="11.2" style="background:linear-gradient(90deg,#9e8b6b88,#9e8b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">25</div>
+        <div class="bar-pct">0.2%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:400ms">
+        <div class="bar-label" title="對白剪輯" style="width:180px">對白剪輯</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="6.3" style="background:linear-gradient(90deg,#9e8b6b88,#9e8b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">14</div>
+        <div class="bar-pct">0.1%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:450ms">
+        <div class="bar-label" title="導演助理" style="width:180px">導演助理</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="5.8" style="background:linear-gradient(90deg,#9e8b6b88,#9e8b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">13</div>
+        <div class="bar-pct">0.1%</div>
+      </div></div></div><div style="margin-bottom:32px"><h3>影視人才服務項目</h3><div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="製作" style="width:180px">製作</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#7b6b9e88,#7b6b9e);width:0%"></div>
+        </div>
+        <div class="bar-count">167</div>
+        <div class="bar-pct">1.6%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="動畫" style="width:180px">動畫</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="27.5" style="background:linear-gradient(90deg,#7b6b9e88,#7b6b9e);width:0%"></div>
+        </div>
+        <div class="bar-count">46</div>
+        <div class="bar-pct">0.4%</div>
+      </div></div></div><div style="margin-bottom:32px"><h3>所在地</h3><div class="bar-list">
+      <div class="bar-row" style="animation-delay:0ms">
+        <div class="bar-label" title="台北市" style="width:180px">台北市</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="100.0" style="background:linear-gradient(90deg,#9e7b6b88,#9e7b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">64</div>
+        <div class="bar-pct">0.6%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:50ms">
+        <div class="bar-label" title="新北市" style="width:180px">新北市</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="85.9" style="background:linear-gradient(90deg,#9e7b6b88,#9e7b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">55</div>
+        <div class="bar-pct">0.5%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:100ms">
+        <div class="bar-label" title="桃園市" style="width:180px">桃園市</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="81.2" style="background:linear-gradient(90deg,#9e7b6b88,#9e7b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">52</div>
+        <div class="bar-pct">0.5%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:150ms">
+        <div class="bar-label" title="新竹市" style="width:180px">新竹市</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="70.3" style="background:linear-gradient(90deg,#9e7b6b88,#9e7b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">45</div>
+        <div class="bar-pct">0.4%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:200ms">
+        <div class="bar-label" title="新竹縣" style="width:180px">新竹縣</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="62.5" style="background:linear-gradient(90deg,#9e7b6b88,#9e7b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">40</div>
+        <div class="bar-pct">0.4%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:250ms">
+        <div class="bar-label" title="宜蘭縣" style="width:180px">宜蘭縣</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="54.7" style="background:linear-gradient(90deg,#9e7b6b88,#9e7b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">35</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:300ms">
+        <div class="bar-label" title="基隆市" style="width:180px">基隆市</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="46.9" style="background:linear-gradient(90deg,#9e7b6b88,#9e7b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">30</div>
+        <div class="bar-pct">0.3%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:350ms">
+        <div class="bar-label" title="台中市" style="width:180px">台中市</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="37.5" style="background:linear-gradient(90deg,#9e7b6b88,#9e7b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">24</div>
+        <div class="bar-pct">0.2%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:400ms">
+        <div class="bar-label" title="苗栗縣" style="width:180px">苗栗縣</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="31.2" style="background:linear-gradient(90deg,#9e7b6b88,#9e7b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">20</div>
+        <div class="bar-pct">0.2%</div>
+      </div>
+      <div class="bar-row" style="animation-delay:450ms">
+        <div class="bar-label" title="彰化縣" style="width:180px">彰化縣</div>
+        <div class="bar-track">
+          <div class="bar-fill" data-w="31.2" style="background:linear-gradient(90deg,#9e7b6b88,#9e7b6b);width:0%"></div>
+        </div>
+        <div class="bar-count">20</div>
+        <div class="bar-pct">0.2%</div>
+      </div></div></div></div>
+    </div>
+  </section>
+
+  <section id="t2-combos">
+    <h2><span class="h2-num">04</span> 最常見篩選欄位組合 Top 10</h2>
+    <div class="card">
+      <table class="combo-table">
+        <thead>
+          <tr>
+            <th>篩選欄位組合</th>
+            <th style="text-align:right">次數</th>
+            <th style="text-align:right">佔比</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td><span style="font-family:'DM Mono',monospace;color:var(--muted);font-size:0.65rem;margin-right:10px">#01</span><div class="tag-wrap" style="display:inline-flex"><span class="tag">類別</span><span class="tag">類型</span></div></td>
+          <td>7,015</td>
+          <td>66.7%</td>
+        </tr>
+        <tr>
+          <td><span style="font-family:'DM Mono',monospace;color:var(--muted);font-size:0.65rem;margin-right:10px">#02</span><div class="tag-wrap" style="display:inline-flex"><span class="tag">類別</span></div></td>
+          <td>1,423</td>
+          <td>13.5%</td>
+        </tr>
+        <tr>
+          <td><span style="font-family:'DM Mono',monospace;color:var(--muted);font-size:0.65rem;margin-right:10px">#03</span><div class="tag-wrap" style="display:inline-flex"><span class="tag">類別</span><span class="tag">影視人才職務</span></div></td>
+          <td>619</td>
+          <td>5.9%</td>
+        </tr>
+        <tr>
+          <td><span style="font-family:'DM Mono',monospace;color:var(--muted);font-size:0.65rem;margin-right:10px">#04</span><div class="tag-wrap" style="display:inline-flex"><span class="tag">類別</span><span class="tag">風格</span></div></td>
+          <td>464</td>
+          <td>4.4%</td>
+        </tr>
+        <tr>
+          <td><span style="font-family:'DM Mono',monospace;color:var(--muted);font-size:0.65rem;margin-right:10px">#05</span><div class="tag-wrap" style="display:inline-flex"><span class="tag">類別</span><span class="tag">產業</span></div></td>
+          <td>453</td>
+          <td>4.3%</td>
+        </tr>
+        <tr>
+          <td><span style="font-family:'DM Mono',monospace;color:var(--muted);font-size:0.65rem;margin-right:10px">#06</span><div class="tag-wrap" style="display:inline-flex"><span class="tag">類別</span><span class="tag">影視人才服務項目</span></div></td>
+          <td>211</td>
+          <td>2.0%</td>
+        </tr>
+        <tr>
+          <td><span style="font-family:'DM Mono',monospace;color:var(--muted);font-size:0.65rem;margin-right:10px">#07</span><div class="tag-wrap" style="display:inline-flex"><span class="tag">類別</span><span class="tag">類型</span><span class="tag">片長</span></div></td>
+          <td>81</td>
+          <td>0.8%</td>
+        </tr>
+        <tr>
+          <td><span style="font-family:'DM Mono',monospace;color:var(--muted);font-size:0.65rem;margin-right:10px">#08</span><div class="tag-wrap" style="display:inline-flex"><span class="tag">類別</span><span class="tag">所在地</span></div></td>
+          <td>69</td>
+          <td>0.7%</td>
+        </tr>
+        <tr>
+          <td><span style="font-family:'DM Mono',monospace;color:var(--muted);font-size:0.65rem;margin-right:10px">#09</span><div class="tag-wrap" style="display:inline-flex"><span class="tag">類別</span><span class="tag">類型</span><span class="tag">風格</span></div></td>
+          <td>49</td>
+          <td>0.5%</td>
+        </tr>
+        <tr>
+          <td><span style="font-family:'DM Mono',monospace;color:var(--muted);font-size:0.65rem;margin-right:10px">#10</span><div class="tag-wrap" style="display:inline-flex"><span class="tag">類別</span><span class="tag">類型</span><span class="tag">片長</span><span class="tag">風格</span></div></td>
+          <td>37</td>
+          <td>0.4%</td>
+        </tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="insight-box">
+      <div class="insight-icon">💡</div>
+      <div class="insight-body">
+        <div class="insight-title">Task 02 結論</div>
+        <p>使用者行為以「純篩選」為絕對主流（95%），直接輸入搜尋文字的比例僅 5%，顯示大多數用戶傾向透過分類條件縮小範圍，而非主動輸入關鍵字。</p>
+        <p>在篩選維度上，「類別」使用率最高，其次為「類型」與「影視人才職務」，顯示用戶最在意的是作品與人才的大分類。多數篩選行為僅使用 1 個條件，組合篩選的比例較低，代表進階篩選的潛力尚未被充分發揮。</p>
+      </div>
+    </div>
+
+  <!-- ══════════════════ TASK 3 ══════════════════ -->
+  <section id="t3-general" style="margin-top:80px">
+    <header class="page-header">
+      <div class="eyebrow">站內搜尋行為分析　·　Task 03</div>
+      <h1>熱詞分析</h1>
+      <p class="subtitle">
+        <span>2026.02.04</span> — <span>2026.03.09</span>
+        &emsp;｜&emsp; 僅計算有輸入搜尋文字之紀錄
+      </p>
+    </header>
+    <div class="hairline"></div>
+    <h2><span class="h2-num">01</span> 一般搜尋熱詞</h2>
+    <div class="card" style="padding:20px">
+      <img src="hotword_一般搜尋.png" style="width:100%;border-radius:6px;display:block">
+    </div>
+  </section>
+
+  <section id="t3-advanced">
+    <h2><span class="h2-num">02</span> 進階搜尋熱詞</h2>
+    <div class="card" style="padding:20px">
+      <img src="hotword_進階搜尋.png" style="width:100%;border-radius:6px;display:block">
+    </div>
+  </section>
+
+  <div class="insight-box">
+    <div class="insight-icon">💡</div>
+    <div class="insight-body">
+      <div class="insight-title">Task 03 結論</div>
+      <p>一般搜尋的關鍵字以<strong>人名、品牌名、產品類別</strong>為主（如人名、家具、汽車、牙刷），屬於目的明確的精準查詢，用戶已知道自己要找什麼。</p>
+      <p>進階搜尋則出現較多<strong>完整描述句</strong>（如「醫美診所的形象片」、「有星就是好旅館」），顯示這類用戶傾向用自然語言描述需求，搜尋意圖更偏向「探索發現」而非「精準定位」，屬於較高意圖的主動探索行為。</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// animate bars on load
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.bar-fill[data-w]').forEach((el, i) => {
+    el.style.width = '0%';
+    setTimeout(() => {
+      el.style.transition = `width 0.9s cubic-bezier(0.16,1,0.3,1) ${i * 40}ms`;
+      el.style.width = el.dataset.w + '%';
+    }, 100);
+  });
+  document.querySelectorAll('[data-stroke]').forEach((el, i) => {
+    const final = parseFloat(el.dataset.stroke);
+    el.style.strokeDashoffset = el.getAttribute('stroke-dasharray');
+    setTimeout(() => {
+      el.style.transition = `stroke-dashoffset 1s cubic-bezier(0.16,1,0.3,1) ${i * 80}ms`;
+      el.style.strokeDashoffset = final;
+    }, 200);
+  });
+  document.querySelectorAll('.stat').forEach((el, i) => {
+    el.style.animationDelay = `${i * 80}ms`;
+  });
+});
+</script>
+
+
+<script>
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.sidenav a[href^="#"]');
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(s => {
+    if (window.scrollY >= s.offsetTop - 120) current = s.id;
+  });
+  navLinks.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+  });
+});
+</script>
+
+</body></html>
