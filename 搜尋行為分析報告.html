@@ -192,6 +192,25 @@ h3::after { content: ""; height: 1px; flex: 1; background: var(--bg3); }
 .page-header { animation: fadeUp 0.8s ease both; }
 .card { animation: fadeUp 0.6s ease both; }
 
+.insight-box {
+  display: flex; gap: 16px; align-items: flex-start;
+  background: linear-gradient(135deg, #fffbf0 0%, #fef9ec 100%);
+  border: 1px solid rgba(160,120,40,0.25); border-left: 4px solid var(--gold);
+  border-radius: var(--r); padding: 24px 28px; margin: 20px 0 48px;
+  box-shadow: 0 2px 8px rgba(160,120,40,0.08);
+}
+.insight-icon { font-size: 1.4rem; line-height: 1; flex-shrink: 0; margin-top: 2px; }
+.insight-body { flex: 1; }
+.insight-title {
+  font-family: "DM Mono", monospace; font-size: 0.65rem; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--gold); margin-bottom: 10px; font-weight: 500;
+}
+.insight-body p {
+  font-size: 0.88rem; color: var(--text); line-height: 1.75; margin-bottom: 8px;
+}
+.insight-body p:last-child { margin-bottom: 0; }
+.insight-body strong { color: var(--gold); font-weight: 600; }
+
 .sidenav {
   position: fixed; left: 0; top: 0; bottom: 0; width: 200px;
   background: #fff; border-right: 1px solid rgba(160,120,40,0.15);
@@ -363,9 +382,18 @@ h3::after { content: ""; height: 1px; flex: 1; background: var(--bg3); }
         <div class="bar-pct">82.6%</div>
       </div></div>
     </div>
+    <div class="insight-box">
+      <div class="insight-icon">💡</div>
+      <div class="insight-body">
+        <div class="insight-title">Task 01 結論</div>
+        <p>一般搜尋幾乎由 Web 端主導（98.9%），行動裝置使用率極低，顯示此功能主要在桌面情境下被觸發。</p>
+        <p>相較之下，進階搜尋的 iOS 佔比明顯偏高（17.4% vs 1.1%），推測 App 端在介面設計上對進階篩選有更顯著的入口或引導，促使行動用戶更容易啟用進階搜尋。</p>
+      </div>
+    </div>
   </section>
 
   <!-- ══════════════════ TASK 2 ══════════════════ -->
+
   <section id="t2-overview" style="margin-top:80px">
     <header class="page-header">
       <div class="eyebrow">站內搜尋行為分析　·　Task 02</div>
@@ -1083,6 +1111,15 @@ h3::after { content: ""; height: 1px; flex: 1; background: var(--bg3); }
     </div>
   </section>
 
+  <div class="insight-box">
+      <div class="insight-icon">💡</div>
+      <div class="insight-body">
+        <div class="insight-title">Task 02 結論</div>
+        <p>使用者行為以「純篩選」為絕對主流（95%），直接輸入搜尋文字的比例僅 5%，顯示大多數用戶傾向透過分類條件縮小範圍，而非主動輸入關鍵字。</p>
+        <p>在篩選維度上，「類別」使用率最高，其次為「類型」與「影視人才職務」，顯示用戶最在意的是作品與人才的大分類。多數篩選行為僅使用 1 個條件，組合篩選的比例較低，代表進階篩選的潛力尚未被充分發揮。</p>
+      </div>
+    </div>
+
   <!-- ══════════════════ TASK 3 ══════════════════ -->
   <section id="t3-general" style="margin-top:80px">
     <header class="page-header">
@@ -1106,6 +1143,15 @@ h3::after { content: ""; height: 1px; flex: 1; background: var(--bg3); }
       <img src="hotword_進階搜尋.png" style="width:100%;border-radius:6px;display:block">
     </div>
   </section>
+
+  <div class="insight-box">
+    <div class="insight-icon">💡</div>
+    <div class="insight-body">
+      <div class="insight-title">Task 03 結論</div>
+      <p>一般搜尋的關鍵字以<strong>人名、品牌名、產品類別</strong>為主（如人名、家具、汽車、牙刷），屬於目的明確的精準查詢，用戶已知道自己要找什麼。</p>
+      <p>進階搜尋則出現較多<strong>完整描述句</strong>（如「醫美診所的形象片」、「有星就是好旅館」），顯示這類用戶傾向用自然語言描述需求，搜尋意圖更偏向「探索發現」而非「精準定位」，屬於較高意圖的主動探索行為。</p>
+    </div>
+  </div>
 
 </div>
 

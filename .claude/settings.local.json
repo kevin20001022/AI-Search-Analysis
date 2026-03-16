@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(open:*)",
+      "Read(//Users/wupeihua/.claude/**)",
+      "Read(//Users/wupeihua/.claude/plugins/**)",
+      "Bash(ls:*)",
+      "Bash(git init:*)",
+      "Bash(cat:*)",
+      "Bash(gh repo:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
