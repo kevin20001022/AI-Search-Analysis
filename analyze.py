@@ -229,8 +229,8 @@ def draw_hot_word_chart(texts, title, output_path):
 
 texts_general = df[(df['是否為進階搜索'] == '0') & df['搜尋文字'].ne('')]['搜尋文字'].tolist()
 texts_advanced = df[(df['是否為進階搜索'] == '1') & df['搜尋文字'].ne('')]['搜尋文字'].tolist()
-draw_hot_word_chart(texts_general, '一般搜尋 — 熱詞分析', f'{OUTPUT_DIR}/hotword_一般搜尋.png')
-draw_hot_word_chart(texts_advanced, '進階搜尋 — 熱詞分析', f'{OUTPUT_DIR}/hotword_進階搜尋.png')
+draw_hot_word_chart(texts_general, '', f'{OUTPUT_DIR}/hotword_一般搜尋.png')
+draw_hot_word_chart(texts_advanced, '', f'{OUTPUT_DIR}/hotword_進階搜尋.png')
 
 # ════════════════════════════════════════════════════════════════════════
 # 輸出 HTML 報告（Cinematic Editorial 美學）
