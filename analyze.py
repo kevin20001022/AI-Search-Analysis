@@ -51,22 +51,9 @@ df['ip'] = df['ip'].str.strip()
 FILTER_COLS = ['類別', '類型', '片長', '風格', '產業', '影視人才職務', '影視人才服務項目', '所在地']
 
 # ════════════════════════════════════════════════════════════════════════
-# Task 1：一般 vs 進階搜尋 × 裝置比例
+# Task 2：搜尋 vs 篩選 + 詳細篩選分析（dedup_sessions 先定義）
 # ════════════════════════════════════════════════════════════════════════
-df_text = df[df['搜尋文字'].ne('')].copy()
-df_text['搜尋類型'] = df_text['是否為進階搜索'].map({'0': '一般搜尋', '1': '進階搜尋'})
-
-t1_data = {}
-for search_type, group in df_text.groupby('搜尋類型'):
-    total = len(group)
-    t1_data[search_type] = {'total': total, 'devices': {}}
-    for device, count in group['裝置'].value_counts().items():
-        t1_data[search_type]['devices'][device] = {'count': int(count), 'pct': round(count / total * 100, 1)}
-
-# ════════════════════════════════════════════════════════════════════════
-# Task 2：搜尋 vs 篩選 + 詳細篩選分析
-# ════════════════════════════════════════════════════════════════════════
-def dedup_sessions(sub_df, window_sec=30):
+def dedup_sessions(sub_df, window_sec=300):
     sub_df = sub_df.sort_values('時間').reset_index(drop=True)
     key_cols = ['ip', '搜尋文字'] + FILTER_COLS
     last_time = {}
@@ -81,6 +68,20 @@ def dedup_sessions(sub_df, window_sec=30):
             kept_rows.append(row)
         last_time[key] = t
     return pd.DataFrame(kept_rows) if kept_rows else pd.DataFrame(columns=sub_df.columns)
+
+# ════════════════════════════════════════════════════════════════════════
+# Task 1：一般 vs 進階搜尋 × 裝置比例（去重後）
+# ════════════════════════════════════════════════════════════════════════
+df_text_raw = df[df['搜尋文字'].ne('')].copy()
+df_text = dedup_sessions(df_text_raw)
+df_text['搜尋類型'] = df_text['是否為進階搜索'].map({'0': '一般搜尋', '1': '進階搜尋'})
+
+t1_data = {}
+for search_type, group in df_text.groupby('搜尋類型'):
+    total = len(group)
+    t1_data[search_type] = {'total': total, 'devices': {}}
+    for device, count in group['裝置'].value_counts().items():
+        t1_data[search_type]['devices'][device] = {'count': int(count), 'pct': round(count / total * 100, 1)}
 
 df_search_raw = df[df['搜尋文字'].ne('')]
 df_filter_raw = df[df['搜尋文字'].eq('') & df[FILTER_COLS].apply(
@@ -716,8 +717,8 @@ window.addEventListener('scroll', () => {
       <div class="insight-icon">💡</div>
       <div class="insight-body">
         <div class="insight-title">Task 01 結論</div>
-        <p>一般搜尋幾乎由 Web 端主導（98.9%），行動裝置使用率極低，顯示此功能主要在桌面情境下被觸發。</p>
-        <p>相較之下，進階搜尋的 iOS 佔比明顯偏高（17.4% vs 1.1%），推測 App 端在介面設計上對進階篩選有更顯著的入口或引導，促使行動用戶更容易啟用進階搜尋。</p>
+        <p>一般搜尋幾乎由 Web 端主導（98.1%），行動裝置使用率極低，顯示此功能主要在桌面情境下被觸發。</p>
+        <p>相較之下，進階搜尋的 iOS 佔比明顯偏高（19.4% vs 1.9%），推測 App 端在介面設計上對進階篩選有更顯著的入口或引導，促使行動用戶更容易啟用進階搜尋。</p>
       </div>
     </div>
   </section>
